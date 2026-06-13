@@ -33,4 +33,14 @@ public class AccountRepository(AppDbContext db) : IAccountRepository
             .Where(a => a.UserId == userId && a.Id != excludeAccountId && a.Status == AccountStatus.Active)
             .ToListAsync();
     }
+    
+    public async Task<User?> GetUserByIdAsync(int userId) =>
+        await db.Users.FindAsync(userId);
+
+    public async Task AddAsync(Account account) =>
+        await db.Accounts.AddAsync(account);
+
+    public async Task SaveChangesAsync() =>
+        await db.SaveChangesAsync();
+    
 }

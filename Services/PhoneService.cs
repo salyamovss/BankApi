@@ -2,28 +2,25 @@ using System.Net;
 using BankApi.Common;
 using BankApi.dal.DTOs.Phone;
 using BankApi.dal.Repositories;
-using BankApi.Data;
 using BankApi.Mappers;
-using Microsoft.EntityFrameworkCore;
 
 namespace BankApi.Services;
 
-public class PhoneService(AppDbContext db, IPhoneRepository phoneRepository, PhoneMapper mapper)
+public class PhoneService(IPhoneRepository phoneRepository, PhoneMapper mapper)
 {
     public async Task<PhoneResponse> Add(int userId, AddPhoneRequest request)
     {
-        if (!await db.Users.AnyAsync(u => u.Id == userId && u.IsActive))
+        if (!await phoneRepository.UserExistsAsync(userId))
             throw new AppException(ErrorCodes.UserNotFound, HttpStatusCode.NotFound);
 
         string cleanNumber = request.Number.Trim();
 
-        bool isPhoneTaken = await db.Phones.AnyAsync(p => p.Number == cleanNumber);
-        if (isPhoneTaken)
+        if (await phoneRepository.IsNumberTakenAsync(cleanNumber))
             throw new AppException(ErrorCodes.PhoneAlreadyExists, HttpStatusCode.Conflict);
 
         var phone = mapper.ToEntity(request, userId);
-        db.Phones.Add(phone);
-        await db.SaveChangesAsync();
+        await phoneRepository.AddAsync(phone);
+        await phoneRepository.SaveChangesAsync();
 
         return mapper.ToResponse(phone);
     }
@@ -36,13 +33,11 @@ public class PhoneService(AppDbContext db, IPhoneRepository phoneRepository, Pho
         if (phone.UserId != userId)
             throw new AppException(ErrorCodes.PhoneNotBelongToUser, HttpStatusCode.Forbidden);
 
-        int totalPhonesCount = await db.Phones.CountAsync(p => p.UserId == userId);
+        int totalPhonesCount = await phoneRepository.CountByUserIdAsync(userId);
         if (totalPhonesCount <= 1)
-        {
             throw new AppException(ErrorCodes.CannotDeleteLastPhoneNumber, HttpStatusCode.BadRequest);
-        }
 
-        db.Phones.Remove(phone);
-        await db.SaveChangesAsync();
+        await phoneRepository.RemoveAsync(phone);
+        await phoneRepository.SaveChangesAsync();
     }
 }

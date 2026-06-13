@@ -5,10 +5,19 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace BankApi.Controllers;
 
+/// <summary>
+/// Управление телефонными номерами пользователя
+/// </summary>
 [ApiController]
 [Route("api/phones")]
 public class PhoneController(PhoneService phoneService) : ControllerBase
 {
+    /// <summary>
+    /// Добавить телефонный номер пользователю
+    /// </summary>
+    /// <param name="userId">ID текущего пользователя</param>
+    /// <param name="request">Данные нового телефона</param>
+    /// <returns>Добавленный телефон</returns>
     [HttpPost]
     [SwaggerOperation(Summary = "Добавить телефон пользователю")]
     [ProducesResponseType(typeof(PhoneResponse), StatusCodes.Status201Created)]
@@ -20,6 +29,11 @@ public class PhoneController(PhoneService phoneService) : ControllerBase
         return Created(string.Empty, phone);
     }
 
+    /// <summary>
+    /// Удалить телефонный номер пользователя
+    /// </summary>
+    /// <param name="userId">ID текущего пользователя</param>
+    /// <param name="id">ID телефона для удаления</param>
     [HttpDelete("{id:int}")]
     [SwaggerOperation(Summary = "Удалить телефон пользователя")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

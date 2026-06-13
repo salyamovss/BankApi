@@ -36,6 +36,7 @@ builder.Services.AddScoped<ICardRepository, CardRepository>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IPhoneRepository, PhoneRepository>();
+builder.Services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
 
 // Сервисы
 builder.Services.AddScoped<UserService>();
@@ -45,7 +46,7 @@ builder.Services.AddScoped<CurrencyService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<PhoneService>();
 builder.Services.AddHostedService<CurrencyUpdateJob>();
-
+builder.Services.AddHttpClient();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

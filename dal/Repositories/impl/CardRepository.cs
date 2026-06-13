@@ -27,4 +27,24 @@ public class CardRepository(AppDbContext db) : ICardRepository
             .FirstOrDefaultAsync(c => c.Id == id);
     }
     
+    public async Task<Card?> GetByIdWithAccountAsync(int id) =>
+        await db.Cards
+            .Include(c => c.Account)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+    public async Task<Account?> GetAccountWithUserAsync(int accountId) =>
+        await db.Accounts
+            .Include(a => a.User)
+            .FirstOrDefaultAsync(a => a.Id == accountId);
+
+    public async Task<bool> AccountExistsAsync(int accountId) =>
+        await db.Accounts.AnyAsync(a => a.Id == accountId);
+
+    public async Task AddAsync(Card card) =>
+        await db.Cards.AddAsync(card);
+
+    public async Task SaveChangesAsync() =>
+        await db.SaveChangesAsync();
+    
+    
 }

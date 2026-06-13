@@ -11,4 +11,7 @@ public interface IUserRepository
     
     Task<List<User>> GetPagedListAsync(int page, int pageSize);
     Task<List<User>> GetFilteredAsync(UserFilterRequest filter);
+    Task AddAsync(User user);
+    Task SaveChangesAsync();
+    Task<User?> GetByIdWithAccountsAsync(int id);
 }

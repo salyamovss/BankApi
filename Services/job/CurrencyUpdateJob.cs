@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BankApi.Services.job;
 
-public class CurrencyUpdateJob(IServiceProvider serviceProvider, ILogger<CurrencyUpdateJob> logger) : BackgroundService
+public class CurrencyUpdateJob(IServiceProvider serviceProvider, ILogger<CurrencyUpdateJob> logger, IHttpClientFactory httpClientFactory) : BackgroundService
 {
     // Официальный XML фид Национального Банка Кыргызской Республики
     private const string NbkrApiUrl = "https://www.nbkr.kg/XML/daily.xml";
@@ -32,7 +32,7 @@ public class CurrencyUpdateJob(IServiceProvider serviceProvider, ILogger<Currenc
 
 private async Task UpdateRatesFromNbkrAsync()
 {
-    using var httpClient = new HttpClient();
+    var httpClient = httpClientFactory.CreateClient();
     
     var response = await httpClient.GetAsync(NbkrApiUrl);
     if (!response.IsSuccessStatusCode)

@@ -1,13 +1,12 @@
 using System.Net;
 using BankApi.Common;
 using BankApi.dal.DTOs;
-using BankApi.Data;
-using Microsoft.EntityFrameworkCore;
+using BankApi.dal.Repositories;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace BankApi.Services;
 
-public class CurrencyService(AppDbContext db, IMemoryCache cache)
+public class CurrencyService(IExchangeRateRepository exchangeRateRepository, IMemoryCache cache, ILogger<CurrencyService> logger)
 {
     private const string CacheKey = "ExchangeRates_Cache";
 
@@ -30,34 +29,30 @@ public class CurrencyService(AppDbContext db, IMemoryCache cache)
         return new ConversionResult(convertedAmount, exchangeRate, false);
     }
 
+    /// <summary>
+    /// Возвращает актуальные курсы валют. Сначала проверяет кэш (5 минут),
+    /// при промахе загружает из БД и кэширует результат.
+    /// </summary>
     private async Task<Dictionary<string, decimal>> GetActualRatesAsync()
     {
         if (cache.TryGetValue(CacheKey, out Dictionary<string, decimal>? cachedRates) && cachedRates != null)
-        {
             return cachedRates;
-        }
 
         var ratesResult = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
-            var dbRates = await db.ExchangeRates.AsNoTracking().ToListAsync();
+            var dbRates = await exchangeRateRepository.GetAllAsync();
 
-            if (dbRates != null && dbRates.Count > 0)
-            {
-                foreach (var r in dbRates)
-                {
-                    ratesResult[r.FromCurrency] = r.Rate;
-                }
-            }
-            else
-            {
+            if (dbRates == null || dbRates.Count == 0)
                 throw new Exception("Таблица ExchangeRates пуста в СУБД.");
-            }
+
+            foreach (var r in dbRates)
+                ratesResult[r.FromCurrency] = r.Rate;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CURRENCY SERVICE CRITICAL] Ошибка чтения курсов: {ex.Message}");
+            logger.LogError(ex, "[CURRENCY SERVICE CRITICAL] Ошибка чтения курсов валют.");
             throw new AppException(ErrorCodes.UnsupportedCurrencyConversion, HttpStatusCode.ServiceUnavailable);
         }
 

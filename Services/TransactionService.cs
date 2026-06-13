@@ -4,16 +4,14 @@ using BankApi.dal.DTOs.Transaction;
 using BankApi.dal.Models;
 using BankApi.dal.Models.Enums;
 using BankApi.dal.Repositories;
-using BankApi.Data;
 using BankApi.Mappers;
 
 namespace BankApi.Services;
 
 public class TransactionService(
-    AppDbContext db, 
     IAccountRepository accountRepository,
-    ITransactionRepository transactionRepository, 
-    CurrencyService currencyService, 
+    ITransactionRepository transactionRepository,
+    CurrencyService currencyService,
     TransactionMapper mapper)
 {
     public async Task<TransferResponse> Transfer(int userId, TransferRequest request)
@@ -35,29 +33,13 @@ public class TransactionService(
             toAccount.Currency
         );
 
-        using var dbTransaction = await db.Database.BeginTransactionAsync();
-        try
-        {
-            fromAccount.Balance -= request.Amount;
-            toAccount.Balance += conversion.ConvertedAmount;
+        fromAccount.Balance -= request.Amount;
+        toAccount.Balance += conversion.ConvertedAmount;
 
-            var transaction = mapper.ToEntity(request, fromAccount.Currency, conversion);
-            
-            db.Transactions.Add(transaction);
-            await db.SaveChangesAsync();
+        var transaction = mapper.ToEntity(request, fromAccount.Currency, conversion);
+        var saved = await transactionRepository.ExecuteTransferAsync(fromAccount, toAccount, transaction);
 
-            await db.Entry(transaction).Reference(t => t.FromAccount).LoadAsync();
-            await db.Entry(transaction).Reference(t => t.ToAccount).LoadAsync();
-
-            await dbTransaction.CommitAsync();
-
-            return mapper.ToResponse(transaction, ErrorMessages.Get(ErrorCodes.TransferSuccess));
-        }
-        catch
-        {
-            await dbTransaction.RollbackAsync();
-            throw;
-        }
+        return mapper.ToResponse(saved, ErrorMessages.Get(ErrorCodes.TransferSuccess));
     }
 
     public async Task<List<TransferResponse>> GetByAccountId(int accountId, int userId)

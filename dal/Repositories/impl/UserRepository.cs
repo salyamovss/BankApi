@@ -70,4 +70,16 @@ public class UserRepository(AppDbContext db) : IUserRepository
             .ToListAsync();
     }
     
+    public async Task AddAsync(User user) => await db.Users.AddAsync(user);
+
+    public async Task SaveChangesAsync() => await db.SaveChangesAsync();
+
+    public async Task<User?> GetByIdWithAccountsAsync(int id)
+    {
+        return await db.Users
+            .Include(u => u.Accounts)
+            .ThenInclude(a => a.Cards)
+            .FirstOrDefaultAsync(u => u.Id == id);
+    }
+    
 }

@@ -8,4 +8,7 @@ public interface IAccountRepository
     Task<Account?> GetByIdWithCardsAsync(int id);
     Task<List<Account>> GetByUserIdAsync(int userId);
     Task<List<Account>> GetActiveByUserIdExceptAsync(int userId, int excludeAccountId);
+    Task<User?> GetUserByIdAsync(int userId);
+    Task AddAsync(Account account);
+    Task SaveChangesAsync();
 }

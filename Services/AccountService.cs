@@ -1,6 +1,5 @@
 using System.Net;
 using BankApi.Common;
-using BankApi.Data;
 using BankApi.Mappers; 
 using BankApi.dal.Models;
 using BankApi.dal.DTOs.Account;
@@ -9,35 +8,34 @@ using BankApi.dal.Repositories;
 
 namespace BankApi.Services;
 
-public class AccountService(AppDbContext db, IAccountRepository accountRepository, AccountMapper mapper, CurrencyService currencyService)
+public class AccountService(IAccountRepository accountRepository, AccountMapper mapper, CurrencyService currencyService)
 {
-    
- public async Task<AccountResponse> Create(int userId, CreateAccountRequest request)
-{
-    var user = await db.Users.FindAsync(userId)
-               ?? throw new AppException(ErrorCodes.UserNotFound, HttpStatusCode.NotFound);
+    public async Task<AccountResponse> Create(int userId, CreateAccountRequest request)
+    {
+        var user = await accountRepository.GetUserByIdAsync(userId)
+            ?? throw new AppException(ErrorCodes.UserNotFound, HttpStatusCode.NotFound);
 
-    if (!user.IsActive)
-        throw new AppException(ErrorCodes.UserNotFound, HttpStatusCode.NotFound);
+        if (!user.IsActive)
+            throw new AppException(ErrorCodes.UserNotFound, HttpStatusCode.NotFound);
 
-    string accountNumber = BankHelper.GenerateAccountNumber();
-    var account = mapper.ToEntity(request, userId, accountNumber);
-    account.Currency = request.Currency.ToUpper().Trim();
-    account.Type = request.Type;
+        string accountNumber = BankHelper.GenerateAccountNumber();
+        var account = mapper.ToEntity(request, userId, accountNumber);
+        account.Currency = request.Currency.ToUpper().Trim();
+        account.Type = request.Type;
 
-    db.Accounts.Add(account);
-    await db.SaveChangesAsync();
+        await accountRepository.AddAsync(account);
+        await accountRepository.SaveChangesAsync();
 
-    return mapper.ToResponse(account);
-}
+        return mapper.ToResponse(account);
+    }
 
-public async Task<AccountResponse> GetById(int id)
-{
-    var account = await db.Accounts.FindAsync(id)
-        ?? throw new AppException(ErrorCodes.AccountNotFound, HttpStatusCode.NotFound);
+    public async Task<AccountResponse> GetById(int id)
+    {
+        var account = await accountRepository.GetByIdAsync(id)
+            ?? throw new AppException(ErrorCodes.AccountNotFound, HttpStatusCode.NotFound);
 
-    return mapper.ToResponse(account);
-}
+        return mapper.ToResponse(account);
+    }
 
     public async Task<CloseAccountResponse> Close(int id, CloseAccountRequest request)
     {
@@ -52,7 +50,7 @@ public async Task<AccountResponse> GetById(int id)
         if (accountToClose.Balance == 0)
         {
             ExecuteCloseActions(accountToClose);
-            await db.SaveChangesAsync();
+            await accountRepository.SaveChangesAsync();
             messageText = ErrorMessages.Get(ErrorCodes.AccountClosedSuccess);
             return mapper.ToCloseResponse(accountToClose, messageText);
         }
@@ -76,7 +74,7 @@ public async Task<AccountResponse> GetById(int id)
         accountToClose.Balance = 0;
 
         ExecuteCloseActions(accountToClose);
-        await db.SaveChangesAsync();
+        await accountRepository.SaveChangesAsync();
 
         messageText = ErrorMessages.Get(
             ErrorCodes.AccountClosedWithTransfer,
@@ -85,12 +83,16 @@ public async Task<AccountResponse> GetById(int id)
         return mapper.ToCloseResponse(accountToClose, messageText, targetAccount);
     }
 
-    public async Task<List<AccountResponse>> GetByUserId(int userId) 
-    { 
-        var accounts = await accountRepository.GetByUserIdAsync(userId); 
-        return accounts.Select(mapper.ToResponse).ToList(); 
+    public async Task<List<AccountResponse>> GetByUserId(int userId)
+    {
+        var accounts = await accountRepository.GetByUserIdAsync(userId);
+        return accounts.Select(mapper.ToResponse).ToList();
     }
-    
+
+    /// <summary>
+    /// Устанавливает статус счёта Closed, фиксирует дату закрытия
+    /// и блокирует все привязанные карты.
+    /// </summary>
     private static void ExecuteCloseActions(Account account)
     {
         account.Status = AccountStatus.Closed;
@@ -98,25 +100,23 @@ public async Task<AccountResponse> GetById(int id)
 
         foreach (var card in account.Cards)
             card.Status = CardStatus.Blocked;
-    } 
-    
+    }
+
     public async Task<AccountResponse> Restore(int id)
     {
         var account = await accountRepository.GetByIdWithCardsAsync(id)
-                      ?? throw new AppException(ErrorCodes.AccountNotFound, HttpStatusCode.NotFound);
+            ?? throw new AppException(ErrorCodes.AccountNotFound, HttpStatusCode.NotFound);
 
         if (account.Status == AccountStatus.Active)
             throw new AppException(ErrorCodes.AccountAlreadyActive, HttpStatusCode.Conflict);
 
         account.Status = AccountStatus.Active;
-        account.ClosedAt = null; 
+        account.ClosedAt = null;
 
         foreach (var card in account.Cards.Where(c => c.Status == CardStatus.Blocked))
-        {
             card.Status = CardStatus.Active;
-        }
 
-        await db.SaveChangesAsync();
+        await accountRepository.SaveChangesAsync();
         return mapper.ToResponse(account);
     }
 }
